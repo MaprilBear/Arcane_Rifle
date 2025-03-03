@@ -187,18 +187,70 @@
 #error "Requires FastLED 3.1 or later; check github for latest code."
 #endif
 
+// // This function draws rainbows with an ever-changing,
+// // widely-varying set of parameters.
+// void pride() 
+// {
+//   static uint16_t sPseudotime = 0;
+//   static uint16_t sLastMillis = 0;
+//   static uint16_t sHue16 = 0;
+ 
+//   uint8_t sat8 = beatsin88( 87, 220, 250);
+//   uint8_t brightdepth = beatsin88( 341, 96, 224);
+//   uint16_t brightnessthetainc16 = beatsin88( 203, (25 * 256), (40 * 256));
+//   uint8_t msmultiplier = beatsin88(147, 23, 60);
+
+//   uint16_t hue16 = sHue16;//gHue * 256;
+//   uint16_t hueinc16 = beatsin88(113, 1, 3000);
+  
+//   uint16_t ms = millis();
+//   uint16_t deltams = ms - sLastMillis ;
+//   sLastMillis  = ms;
+//   sPseudotime += deltams * msmultiplier;
+//   sHue16 += deltams * beatsin88( 400, 5,9);
+//   uint16_t brightnesstheta16 = sPseudotime;
+  
+//   for( uint16_t i = 0 ; i < NUM_LEDS; i++) {
+//     hue16 += hueinc16;
+//     uint8_t hue8 = hue16 / 256;
+
+//     brightnesstheta16  += brightnessthetainc16;
+//     uint16_t b16 = sin16( brightnesstheta16  ) + 32768;
+
+//     uint16_t bri16 = (uint32_t)((uint32_t)b16 * (uint32_t)b16) / 65536;
+//     uint8_t bri8 = (uint32_t)(((uint32_t)bri16) * brightdepth) / 65536;
+//     bri8 += (255 - brightdepth);
+    
+//     CRGB newcolor = CHSV( hue8, sat8, bri8);
+    
+//     uint16_t pixelnumber = i;
+//     pixelnumber = (NUM_LEDS-1) - pixelnumber;
+    
+//     nblend( leds[pixelnumber], newcolor, 64);
+//   }
+// }
+
 #define DATA_PIN    5
 //#define CLK_PIN   4
 #define LED_TYPE    WS2811
 #define COLOR_ORDER GRB
-#define NUM_LEDS    444 
-#define BRIGHTNESS  255
+#define NUM_LEDS    50
+#define BRIGHTNESS  100
+#define FRAMES_PER_SECOND 40
 
 CRGB leds[NUM_LEDS];
 
+CRGBPalette256 pallate;
+
+
+// void wide_pulse_setup(CRGB pulseColor, CRGB backgroundColor, int pulseWidth){
+//   for (int i = 0; i < pulseWidth; i++){
+//     leds[i] = blend(background, pulseColor, f=)
+//   }
+// }
 
 void setup() {
-  //delay(3000); // 3 second delay for recovery
+  //delay(5000); // 3 second delay for recovery
 
   Serial.write("Setup!\n\r");
   
@@ -206,58 +258,80 @@ void setup() {
   FastLED.addLeds<LED_TYPE,DATA_PIN,COLOR_ORDER>(leds, NUM_LEDS)
     .setCorrection(TypicalLEDStrip)
     .setDither(BRIGHTNESS < 255);
+  FastLED.setMaxPowerInVoltsAndMilliamps(5, 400);
 
   // set master brightness control
   FastLED.setBrightness(BRIGHTNESS);
+
+  pallate = CRGBPalette256(CRGB::Black, CRGB::Blue, CRGB::Aqua, CRGB::Blue);
+
+  // start the first led and black out all others
+  //fill_gradient_RGB(leds, NUM_LEDS, CRGB::Blue, CRGB::White, CRGB::Blue);
+  CRGB middle = CRGB::Aqua;
+  CRGB background = CRGB::Blue;
+  uint16_t quarter = NUM_LEDS / 4;
+  uint16_t half = (NUM_LEDS / 2);
+    uint16_t last = NUM_LEDS - 1;
+    fill_gradient_RGB( leds,    0, background, quarter, middle);
+    fill_gradient_RGB( leds, quarter, middle, half, background);
+    fill_solid(&leds[half], NUM_LEDS / 2, background);
+
+  //fill_solid(leds, NUM_LEDS, CRGB::Blue);
 }
 
 
-// This function draws rainbows with an ever-changing,
-// widely-varying set of parameters.
-void pride() 
-{
-  static uint16_t sPseudotime = 0;
-  static uint16_t sLastMillis = 0;
-  static uint16_t sHue16 = 0;
- 
-  uint8_t sat8 = beatsin88( 87, 220, 250);
-  uint8_t brightdepth = beatsin88( 341, 96, 224);
-  uint16_t brightnessthetainc16 = beatsin88( 203, (25 * 256), (40 * 256));
-  uint8_t msmultiplier = beatsin88(147, 23, 60);
-
-  uint16_t hue16 = sHue16;//gHue * 256;
-  uint16_t hueinc16 = beatsin88(113, 1, 3000);
-  
-  uint16_t ms = millis();
-  uint16_t deltams = ms - sLastMillis ;
-  sLastMillis  = ms;
-  sPseudotime += deltams * msmultiplier;
-  sHue16 += deltams * beatsin88( 400, 5,9);
-  uint16_t brightnesstheta16 = sPseudotime;
-  
-  for( uint16_t i = 0 ; i < NUM_LEDS; i++) {
-    hue16 += hueinc16;
-    uint8_t hue8 = hue16 / 256;
-
-    brightnesstheta16  += brightnessthetainc16;
-    uint16_t b16 = sin16( brightnesstheta16  ) + 32768;
-
-    uint16_t bri16 = (uint32_t)((uint32_t)b16 * (uint32_t)b16) / 65536;
-    uint8_t bri8 = (uint32_t)(((uint32_t)bri16) * brightdepth) / 65536;
-    bri8 += (255 - brightdepth);
-    
-    CRGB newcolor = CHSV( hue8, sat8, bri8);
-    
-    uint16_t pixelnumber = i;
-    pixelnumber = (NUM_LEDS-1) - pixelnumber;
-    
-    nblend( leds[pixelnumber], newcolor, 64);
+void decay(){
+  for(int i = 0; i < NUM_LEDS; i++){
+    leds[i] -= 0x000008;
   }
 }
 
+void propagate(){
+
+  CRGB temp = leds[NUM_LEDS - 1];
+  for (int i = NUM_LEDS - 1; i > 0; i--){
+    leds[i] = leds[i - 1];
+  }
+  leds[0] = temp;
+}
+
+void charged_pulse(){
+  propagate();
+  leds[0] = CRGB::White;
+}
+
+
+
+
+int count = 0;
+
 void loop()
 {
-  //Serial.write("Loop!\n\r");
-  pride();
-  FastLED.show();  
+  Serial.write("Loop ");
+  Serial.write(count);
+  Serial.write("!\n\r");
+
+  if (count < 400){
+    propagate();
+  } else if (count == 400){
+    fill_solid(leds, NUM_LEDS, CRGB::Blue);
+  } else if (count < 416){
+    decay();
+  } else {
+    charged_pulse();
+  }
+  
+
+  FastLED.show(); // display this frame
+  if (count <= 100){
+    FastLED.delay(1000 / FRAMES_PER_SECOND);
+  } else if (count < 400){
+    FastLED.delay(1000 / FRAMES_PER_SECOND / 4);
+  } else if (count <= 416){
+    FastLED.delay(1000 / FRAMES_PER_SECOND); 
+  } else if {
+    FastLED.delay(1000 / FRAMES_PER_SECOND / 8);
+  }
+
+  count++;
 }
