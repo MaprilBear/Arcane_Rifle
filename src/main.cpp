@@ -234,8 +234,8 @@
 //#define CLK_PIN   4
 #define LED_TYPE    WS2811
 #define COLOR_ORDER GRB
-#define NUM_LEDS    50
-#define BRIGHTNESS  100
+#define NUM_LEDS    300
+#define BRIGHTNESS  25
 #define FRAMES_PER_SECOND 40
 
 CRGB leds[NUM_LEDS];
@@ -248,6 +248,29 @@ CRGBPalette256 pallate;
 //     leds[i] = blend(background, pulseColor, f=)
 //   }
 // }
+
+#define PLASMA_RESOLUTION 20
+#define PLASMA_SPEED 10
+#define PLASMA_OFFSET 100
+
+CRGBPalette256 plasma_pallate;
+uint8_t noise_buffer[NUM_LEDS];
+uint32_t noise_counter = 0;
+
+void plasma(){
+  // get next noise frame
+  for (int i = 0; i < NUM_LEDS; i++){
+    noise_buffer[i] = inoise8(PLASMA_RESOLUTION * (PLASMA_OFFSET + i), noise_counter);
+    Serial.printf("%x ", noise_buffer[i]);
+  }
+  Serial.write("\n");
+  noise_counter += PLASMA_SPEED;
+
+  // map noise to pallate
+  for (int i = 0; i < NUM_LEDS; i++){
+    leds[i] = ColorFromPalette(plasma_pallate, noise_buffer[i]);
+  }
+}
 
 void setup() {
   //delay(5000); // 3 second delay for recovery
@@ -267,17 +290,22 @@ void setup() {
 
   // start the first led and black out all others
   //fill_gradient_RGB(leds, NUM_LEDS, CRGB::Blue, CRGB::White, CRGB::Blue);
-  CRGB middle = CRGB::Aqua;
-  CRGB background = CRGB::Blue;
-  uint16_t quarter = NUM_LEDS / 4;
-  uint16_t half = (NUM_LEDS / 2);
-    uint16_t last = NUM_LEDS - 1;
-    fill_gradient_RGB( leds,    0, background, quarter, middle);
-    fill_gradient_RGB( leds, quarter, middle, half, background);
-    fill_solid(&leds[half], NUM_LEDS / 2, background);
+  // CRGB middle = CRGB::Aqua;
+  // CRGB background = CRGB::Blue;
+  // uint16_t quarter = NUM_LEDS / 4;
+  // uint16_t half = (NUM_LEDS / 2);
+  //   uint16_t last = NUM_LEDS - 1;
+  //   fill_gradient_RGB( leds,    0, background, quarter, middle);
+  //   fill_gradient_RGB( leds, quarter, middle, half, background);
+  //   fill_solid(&leds[half], NUM_LEDS / 2, background);
 
   //fill_solid(leds, NUM_LEDS, CRGB::Blue);
+
+  plasma_pallate = CRGBPalette256(CRGB::Black, CRGB::DarkBlue, CRGB::Aqua);
 }
+
+// plasma
+
 
 
 void decay(){
@@ -300,12 +328,16 @@ void charged_pulse(){
   leds[0] = CRGB::White;
 }
 
-
+void loop(){
+  plasma();
+  FastLED.show(); // display this frame
+  FastLED.delay(1000 / FRAMES_PER_SECOND);
+}
 
 
 int count = 0;
 
-void loop()
+void loop2()
 {
   Serial.write("Loop ");
   Serial.write(count);
@@ -329,7 +361,7 @@ void loop()
     FastLED.delay(1000 / FRAMES_PER_SECOND / 4);
   } else if (count <= 416){
     FastLED.delay(1000 / FRAMES_PER_SECOND); 
-  } else if {
+  } else {
     FastLED.delay(1000 / FRAMES_PER_SECOND / 8);
   }
 
