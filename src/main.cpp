@@ -234,9 +234,9 @@
 //#define CLK_PIN   4
 #define LED_TYPE    WS2811
 #define COLOR_ORDER GRB
-#define NUM_LEDS    300
-#define BRIGHTNESS  25
-#define FRAMES_PER_SECOND 40
+#define NUM_LEDS    75
+#define BRIGHTNESS  128
+#define FRAMES_PER_SECOND 60
 
 CRGB leds[NUM_LEDS];
 
@@ -250,27 +250,133 @@ CRGBPalette256 pallate;
 // }
 
 #define PLASMA_RESOLUTION 20
-#define PLASMA_SPEED 10
+#define PLASMA_SPEED 5
 #define PLASMA_OFFSET 100
+
+
+void propagate(CRGB* array, bool wrap, bool reverse){
+
+  if (!reverse){
+    CRGB temp = array[NUM_LEDS - 1];
+    for (int i = NUM_LEDS - 1; i > 0; i--){
+      array[i] = array[i - 1];
+    }
+    array[0] = wrap ? temp : CRGB::Black;
+  } else {
+    CRGB temp = array[0];
+    for (int i = 1; i < NUM_LEDS; i++){
+      array[i-1] = array[i];
+    }
+    array[NUM_LEDS - 1] = wrap ? temp : CRGB::Black;
+  }
+ 
+}
+
+CRGB pulser[NUM_LEDS];
+
+void pulser_setup(){
+  fill_solid(pulser, NUM_LEDS, CRGB::Black);
+}
+
+#define TIME_BETWEEN_PULSES 1
+#define PULSE_WIDTH 3
+#define PULSE_BLUR_WIDTH 0
+#define PULSE_BLUR_AMOUNT 172
+#define PULSE_SPEED 4
+uint8_t faster = 0;
+void pulser_update(){
+  static uint32_t pulse_timer = 0;
+  // 
+  if (pulse_timer % ((TIME_BETWEEN_PULSES  + (3 - faster / 10)) * (FRAMES_PER_SECOND / 10)) == 0){
+    // spawn new pulse
+    fill_solid(&pulser[PULSE_BLUR_WIDTH], PULSE_WIDTH, CRGB::Cyan + 0x880000); 
+
+    
+  }
+  // blur surroundings
+  blur1d(pulser, NUM_LEDS, 64);
+
+  // shift
+  for (int i = 0; i < faster / 10; i++){
+    propagate(pulser, false, false);
+    pulser[0] = CRGB::DarkBlue;
+  }
+
+  pulse_timer++;
+}
+
+CRGB spinner[NUM_LEDS];
+CRGBPalette256 spinner_pallate;
+
+void spinner_setup(){
+  //spinner_pallate = CRGBPalette256(CRGB::Black, CRGB::Blue, CRGB::Black, CRGB::Blue);
+  fill_solid(spinner, NUM_LEDS, CRGB::White);
+}
+
+void spinner_update(){
+  static uint16_t counter = 0;
+  if (counter++ % 1 == 0){
+    propagate(spinner, true, false);
+    propagate(spinner, true, false);
+  }
+}
 
 CRGBPalette256 plasma_pallate;
 uint8_t noise_buffer[NUM_LEDS];
 uint32_t noise_counter = 0;
 
+fract16 fraction = 0;
+uint32_t counter2 = 0;
+bool once = true;
 void plasma(){
+  static uint16_t counter = 0;
   // get next noise frame
   for (int i = 0; i < NUM_LEDS; i++){
     noise_buffer[i] = inoise8(PLASMA_RESOLUTION * (PLASMA_OFFSET + i), noise_counter);
-    Serial.printf("%x ", noise_buffer[i]);
+    //Serial.printf("%x ", noise_buffer[i]);
   }
-  Serial.write("\n");
-  noise_counter += PLASMA_SPEED;
-
+  //Serial.write("\n");
+  noise_counter += PLASMA_SPEED + faster;
   // map noise to pallate
-  for (int i = 0; i < NUM_LEDS; i++){
-    leds[i] = ColorFromPalette(plasma_pallate, noise_buffer[i]);
+  if (fraction <= 50){
+    for (int i = 0; i < NUM_LEDS; i++){
+      leds[i] = ColorFromPalette(plasma_pallate, noise_buffer[i]);
+    }
+  } 
+
+  if (faster > 5){
+    //start blending with bright :)
+    nblend(leds, pulser, NUM_LEDS, fraction);
+
+    if (counter % 3 == 0){
+      fraction = fraction == 255 ? 255 : fraction + 1;
+    }
   }
+  if (fraction > 50){
+    // static uint16_t fade_index = 0;
+    // for (int i = 0; i < NUM_LEDS; i++){
+    //   fadeToBlackBy(&leds[fade_index + i], 1, (255 / 20));
+    // }
+    // propagate(leds, false, true);
+    // propagate(leds, false, true);
+    // fade_index = fade_index == 0 ? 0 : fade_index - 1;
+
+    // blend with pulser
+  }
+
+  //spinner_update();
+  
+  
+
+  if (counter % 5 == 0){
+    faster = faster == 30 ? 30 : faster + 1;
+    Serial.printf("faster = %d\n", faster);
+  }
+  counter++;
 }
+
+
+
 
 void setup() {
   //delay(5000); // 3 second delay for recovery
@@ -301,7 +407,11 @@ void setup() {
 
   //fill_solid(leds, NUM_LEDS, CRGB::Blue);
 
-  plasma_pallate = CRGBPalette256(CRGB::Black, CRGB::DarkBlue, CRGB::Aqua);
+  plasma_pallate = CRGBPalette256(CRGB::MidnightBlue, CRGB::DarkBlue, CRGB::Blue, CRGB::Cyan);
+
+  spinner_setup();
+
+  pulser_setup();
 }
 
 // plasma
@@ -314,22 +424,16 @@ void decay(){
   }
 }
 
-void propagate(){
 
-  CRGB temp = leds[NUM_LEDS - 1];
-  for (int i = NUM_LEDS - 1; i > 0; i--){
-    leds[i] = leds[i - 1];
-  }
-  leds[0] = temp;
-}
 
 void charged_pulse(){
-  propagate();
+  propagate(leds, true, false);
   leds[0] = CRGB::White;
 }
 
 void loop(){
   plasma();
+  pulser_update();
   FastLED.show(); // display this frame
   FastLED.delay(1000 / FRAMES_PER_SECOND);
 }
@@ -344,7 +448,7 @@ void loop2()
   Serial.write("!\n\r");
 
   if (count < 400){
-    propagate();
+    propagate(leds, true, false);
   } else if (count == 400){
     fill_solid(leds, NUM_LEDS, CRGB::Blue);
   } else if (count < 416){
